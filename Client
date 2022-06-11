@@ -1,0 +1,210 @@
+import threading
+import time
+import tkinter
+import tkinter.messagebox
+import socket
+from Message import *
+import sys
+from tkinter import ttk
+import tkinter.filedialog
+
+
+class Client_GUI:  # 客户端GUI
+    def __init__(self, window):  # 初始化客户端
+        self.window = window
+        self.port = 6060
+        self.state = False
+        self.selectUser = None
+        self.var = tkinter.IntVar()
+
+    def set_init_window(self):  # 初始化窗口控件
+        self.window.title('客户端')
+        self.window.geometry('612x355')
+        self.window.resizable(width=False, height=False)
+        self.window.tk.eval('package require Tix')
+        self.window.protocol('WM_DELETE_WINDOW', self.window_closing)
+        # 用户名
+        self.Username_label = tkinter.Label(self.window, text='用户名:', font=('SimHei', 12))
+        self.Username_label.grid(column=0, row=0)
+        self.username_entry = tkinter.Entry(self.window, bd=3, width=10)
+        self.username_entry.grid(column=1, row=0, columnspan=1)
+
+        # 密码
+        self.Password_lable = tkinter.Label(self.window, text='口令:', font=('SimHei', 12))
+        self.Password_lable.grid(column=2, row=0)
+        self.var_usr_pwd = tkinter.StringVar()
+        self.Password_entry = tkinter.Entry(self.window, textvariable=self.var_usr_pwd, show='*', bd=3, width=10)
+        self.Password_entry.grid(column=3, row=0, columnspan=1)
+
+        # 服务器
+        self.Server_lable = tkinter.Label(self.window, text='服务器:', font=('SimHei', 12))
+        self.Server_lable.grid(column=4, row=0)
+        self.Server_entry = tkinter.Entry(self.window, bd=3, width=15)
+        self.Server_entry.grid(column=5, row=0, columnspan=2)
+
+        # 登录按钮
+        self.Login_button = tkinter.Button(self.window, text='登陆', font=('SimHei', 12), command=self.login)
+        self.Login_button.grid(column=7, row=0)
+
+        # 注册按钮
+        self.registered_button = tkinter.Button(self.window, text='注册', font=('SimHei', 12), command=self.registered)
+        self.registered_button.grid(column=10, row=0, columnspan=2)
+
+        col_count, row_count = window.grid_size()
+        for col in range(col_count):
+            window.grid_columnconfigure(col, minsize=10)
+        for row in range(row_count):
+            window.grid_rowconfigure(row, minsize=10)
+
+        # 消息记录框
+        self.message_group = tkinter.LabelFrame(window, text='消息记录', padx=5, pady=5)
+        self.message_group.grid(column=0, row=1, columnspan=5)
+        self.message_text = tkinter.Text(self.message_group, width=50, height=20, stat='disable')
+        self.message_text.pack()
+
+        # 在线用户框
+        self.useronline = tkinter.LabelFrame(window, text='在线用户', padx=6, pady=5)
+        self.useronline.grid(column=5, row=1, columnspan=8)
+        self.UserGroup = ttk.Treeview(self.useronline, height=12, show='headings')
+        self.UserGroup.pack()
+        self.UserGroup["columns"] = ('用户名', '状态')
+        self.UserGroup.column('用户名', width=105)
+        self.UserGroup.column('状态', width=105)
+        self.UserGroup.heading('用户名', text='用户名')
+        self.UserGroup.heading('状态', text='状态')
+        self.UserGroup.bind('<ButtonRelease-1>', self.UserGroup_Click)
+        # 信息输入框
+        self.Message_entry = tkinter.Entry(self.window, bd=3, width=50)
+        self.Message_entry.grid(column=0, row=2, columnspan=5)
+
+        # 私聊选择
+        self.PrivateChat_bool = tkinter.Checkbutton(self.window, text='私聊', font=('SimHei', 12), variable=self.var)
+        self.PrivateChat_bool.grid(column=5, row=2)
+        # 发送信息按钮
+        self.messagesend_Button = tkinter.Button(self.window, text='发送信息', font=('SimHei', 12),
+                                                 command=self.SendMessage)
+        self.messagesend_Button.grid(column=6, row=2, columnspan=3)
+        # 发送文件按钮
+        self.filesend_Button = tkinter.Button(self.window, text='发送文件', font=('SimHei', 12), command=self.file,state="disable")
+        self.filesend_Button.grid(column=9, row=2, columnspan=3)
+
+        # 数值初始化
+        self.Server_entry.insert(tkinter.END, '192.168.204.154')
+
+    def UserGroup_Click(self, event):  # 获取选择私聊用户名
+        try:
+            self.selectUser = self.UserGroup.selection()[0]
+        except:
+            return 0
+
+    def file(self):  # 发送文件请求
+        pass
+
+    def window_closing(self):  # 关闭窗口
+        sys.exit(1)
+
+    def registered(self):  # 注册用户
+        self.ServerIP = self.Server_entry.get()  # 获取server ip
+        self.Client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # 初始化
+        try:
+            self.connect = self.Client.connect((self.ServerIP, self.port))  # socket连接服务器
+            self.name = self.username_entry.get()
+            self.password = self.Password_entry.get()
+            way = 'registered'
+            message = Messages.Message(way=way, Value=self.name + '\t' + self.password).Information()
+            self.Client.send(message.encode('utf-8'))
+            # self.Client.close()#发完关闭
+        except:
+            tkinter.messagebox.showerror("错误", "服务器无法连接")
+        # 发送注册信息
+
+    def login(self):  
+        self.ServerIP = self.Server_entry.get()
+        self.Client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            self.connect = self.Client.connect((self.ServerIP, self.port))
+        except ConnectionResetError:
+            tkinter.messagebox.showerror("错误", "服务器无法连接")
+
+        self.name = self.username_entry.get()
+        self.password = self.Password_entry.get()
+        way = 'login'
+        message = Messages.Message(way=way, Value=self.name + '\t' + self.password).Information()
+        # print(message)
+        self.Client.send(message.encode('utf-8'))
+
+        information = self.Client.recv(1024).decode()  # 登录成功用户在线信息接收
+        print(information)
+
+        if information == '用户名或密码错误' or information == '用户已登录':
+            tkinter.messagebox.showinfo("提示", information)
+            self.Client.close()
+            return 0
+
+        messages = Messages.Message(Messages=information)
+        value = messages.value.split('\n')
+        for i in range(0, len(value)):
+            if value[i] != '':
+                self.UserGroup.insert("", 'end', iid=value[i], values=(value[i], '离线'))
+        thread1 = threading.Thread(target=self.AcceptMessage, args=())
+        thread1.daemon = True
+        thread1.start()
+        self.Login_button.config(state='disabled')
+        self.registered_button.config(state='disabled')
+        self.username_entry.config(state='disabled')
+        self.Password_entry.config(state='disabled')
+
+    def SendMessage(self, event=None):  # 发送消息
+        try:
+            if self.var.get() == 0:  # 没有选择私聊
+                information = 'public' + '\t' + self.Message_entry.get()  # 组装information
+                self.Client.send(information.encode('utf-8'))  # 发送
+            else:
+                if self.selectUser == None:  # 没有选用户
+                    tkinter.messagebox.showinfo("提示", "你还没有私聊对象!!!")
+                    return 0
+                else:
+                    information = 'private\t' + self.selectUser + '\t' + self.Message_entry.get()  # 组装私聊information
+                    self.Client.send(information.encode('utf-8'))  # 发送
+        except:
+            tkinter.messagebox.showinfo("提示", "你还没有登陆请重新登陆!!!")
+        self.Message_entry.delete(0, tkinter.END)  # 清空信息发布窗口
+
+    def AcceptMessage(self):  # 请补充接收消息
+        while True:
+            information = Messages.Message(self.Client.recv(1024).decode())  # 接受消息
+
+            # 判断接受消息类型，
+            # 状态消息
+            if information.way == 'Online':
+                info = information.value.split('\t', 99999999)
+                for i in range(len(info)):
+                    if info[i] != '':
+                        if self.UserGroup.exists(info[i]):
+                            self.UserGroup.delete(info[i])
+                        self.UserGroup.insert("", 'end', iid=info[i], values=(info[i], '在线'))
+            elif information.way == 'Offline':
+                if self.UserGroup.exists(information.value):
+                    self.UserGroup.delete(information.value)
+                self.UserGroup.insert("", 'end', iid=information.value, values=(information.value, '离线'))
+            # 简单消息
+            elif information.way == 'public':  # 接收公聊消息
+                self.message_text.config(state='normal')
+                self.message_text.insert(tkinter.END, gettime() + ' ' + information.value + '\n')
+                self.message_text.config(state='disabled')
+            elif information.way == 'private':  # 接收私聊消息
+                info = information.value.split('\t', 2)
+                str = info[1] + '-->' + info[0] + ':' + info[2]
+                self.message_text.config(state='normal')
+                self.message_text.insert(tkinter.END, gettime() + ' ' + str + '\n')
+                self.message_text.config(state='disabled')
+
+
+def gettime():  # 返回以可读字符串表示的当地时间
+    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+
+
+window = tkinter.Tk()
+client = Client_GUI(window)
+client.set_init_window()
+window.mainloop()
